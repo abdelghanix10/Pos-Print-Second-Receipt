@@ -17,7 +17,7 @@
                         <div><t t-esc="line.product_name" /></div>
                         <div style="display: flex; justify-content: space-between;">
                             <span>Qty: <t t-esc="line.quantity" /></span>
-                            <span>Price: <t t-esc="props.formatCurrency(line.price)" /></span>
+                            <span>Price: <t t-esc="props.formatCurrency(line.price || 0)" /></span>
                         </div>
                     </div>
                 </t>

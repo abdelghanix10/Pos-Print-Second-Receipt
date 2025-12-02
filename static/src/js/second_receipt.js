@@ -4,7 +4,7 @@ console.log("POS Print Second Receipt: JS File Loading...");
 
 import { ReceiptScreen } from "@point_of_sale/app/screens/receipt_screen/receipt_screen";
 import { patch } from "@web/core/utils/patch";
-import { Component } from "@odoo/owl";
+import { Component, onMounted } from "@odoo/owl";
 import { PosStore } from "@point_of_sale/app/store/pos_store";
 
 export class SecondReceipt extends Component {
@@ -13,6 +13,13 @@ export class SecondReceipt extends Component {
         data: Object,
         formatCurrency: Function,
     };
+    setup() {
+        super.setup();
+        console.log("POS Print Second Receipt: Component setup...");
+        onMounted(() => {
+            console.log("POS Print Second Receipt: Component mounted!");
+        });
+    }
 }
 
 patch(PosStore.prototype, {
@@ -25,7 +32,11 @@ patch(PosStore.prototype, {
         // We don't strictly check result because printReceipt might return void or undefined
         // But usually if it fails it throws or returns false.
 
-        console.log("POS Print Second Receipt: Original print finished, printing second...");
+        console.log("POS Print Second Receipt: Original print finished, waiting 1s then printing second...");
+
+        // Add a delay to avoid conflict with the first print dialog/job
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
         try {
             const currentOrder = this.get_order();
             if (!currentOrder) {
@@ -34,11 +45,23 @@ patch(PosStore.prototype, {
             }
             const data = currentOrder.export_for_printing();
 
+            // Ensure prices are numbers for formatting
+            if (data.orderlines) {
+                data.orderlines.forEach(line => {
+                    line.price = parseFloat(line.price) || 0;
+                });
+            }
+
             // Use this.printer which is available in PosStore
+            console.log("POS Print Second Receipt: Using printer:", this.printer);
+
+            // Force webPrintFallback to ensure it tries window.print if no device is set
+            // or if we want to force it.
             await this.printer.print(SecondReceipt, {
                 data: data,
                 formatCurrency: this.env.utils.formatCurrency,
-            });
+            }, { webPrintFallback: true });
+
             console.log("POS Print Second Receipt: Second receipt printed");
         } catch (e) {
             console.error("POS Print Second Receipt: Failed to print second receipt:", e);
