@@ -1,5 +1,7 @@
 /** @odoo-module */
 
+console.log("POS Print Second Receipt: JS File Loading...");
+
 import { ReceiptScreen } from "@point_of_sale/app/screens/receipt_screen/receipt_screen";
 import { patch } from "@web/core/utils/patch";
 import { Component } from "@odoo/owl";

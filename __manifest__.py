@@ -6,8 +6,9 @@
     'depends': ['point_of_sale'],
     'data': [],
     'assets': {
-        'point_of_sale.assets': [
-            'pos_print_second_receipt/static/src/**/*',
+        'point_of_sale._assets_pos': [
+            'pos_print_second_receipt/static/src/xml/second_receipt.xml',
+            'pos_print_second_receipt/static/src/js/second_receipt.js',
         ],
     },
     'installable': True,
