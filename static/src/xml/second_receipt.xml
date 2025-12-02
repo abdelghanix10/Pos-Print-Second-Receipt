@@ -1,23 +1,41 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <templates id="template" xml:space="preserve">
     <t t-name="pos_print_second_receipt.SecondReceipt" owl="1">
-        <div class="pos-receipt">
-            <div class="pos-receipt-header" style="text-align: center; font-weight: bold;">
-                SECOND RECEIPT
+        <div class="pos-receipt" style="font-family: 'Inconsolata', monospace; padding: 10px; border: 1px solid #000;">
+            <!-- Info -->
+            <div class="pos-receipt-contact" style="font-size: 14px; margin-bottom: 15px; border-bottom: 1px dashed #000; padding-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Date:</span>
+                    <span style="font-weight: bold;"><t t-esc="props.data.date" /></span>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                    <span>Order No:</span>
+                    <span style="font-weight: bold;"><t t-esc="props.data.name" /></span>
+                </div>
             </div>
-            <br/>
-            <div class="pos-receipt-contact">
-                <div>Date: <t t-esc="props.data.date" /></div>
-                <div>Order: <t t-esc="props.data.name" /></div>
+
+            <!-- Items Header -->
+            <div style="display: flex; font-weight: bold; border-bottom: 1px solid #000; padding-bottom: 5px; margin-bottom: 5px; font-size: 13px;">
+                <span style="flex: 2;">Item</span>
+                <span style="flex: 1; text-align: center;">Qty</span>
+                <span style="flex: 1; text-align: right;">Price</span>
             </div>
-            <br />
-            <div class="pos-receipt-order-data">
+
+            <!-- Items List -->
+            <div class="pos-receipt-order-data" style="font-size: 13px;">
                 <t t-foreach="props.data.orderlines" t-as="line" t-key="line.id">
-                    <div style="margin-bottom: 5px;">
-                        <div><t t-esc="line.product_name" /></div>
-                        <div style="display: flex; justify-content: space-between;">
-                            <span>Qty: <t t-esc="line.quantity" /></span>
-                            <span>Price: <t t-esc="props.formatCurrency(line.price || 0)" /></span>
+                    <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dotted #ccc;">
+                        <div style="font-weight: bold; margin-bottom: 2px;">
+                            <t t-esc="line.product_name || (line.product_name_wrapped ? line.product_name_wrapped[0] : '') || 'Unknown Product'" />
+                        </div>
+                        <div style="display: flex;">
+                            <span style="flex: 2;"></span>
+                            <span style="flex: 1; text-align: center;">
+                                <t t-esc="line.quantity || line.qty || 0" />
+                            </span>
+                            <span style="flex: 1; text-align: right;">
+                                <t t-esc="props.formatCurrency(line.price || line.price_display || 0)" />
+                            </span>
                         </div>
                     </div>
                 </t>
