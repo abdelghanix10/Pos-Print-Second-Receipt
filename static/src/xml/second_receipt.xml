@@ -24,18 +24,15 @@
             <!-- Items List -->
             <div class="pos-receipt-order-data" style="font-size: 13px;">
                 <t t-foreach="props.data.orderlines" t-as="line" t-key="line.id">
-                    <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px dotted #ccc;">
-                        <div style="font-weight: bold; margin-bottom: 2px;">
-                            <t t-esc="line.product_name || (line.product_name_wrapped ? line.product_name_wrapped[0] : '') || 'Unknown Product'" />
+                    <div style="display: flex; margin-bottom: 5px; border-bottom: 1px dotted #ccc; padding-bottom: 2px;">
+                        <div style="flex: 2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold; padding-right: 5px;">
+                            <t t-esc="line.product_name || 'Unknown Product'" />
                         </div>
-                        <div style="display: flex;">
-                            <span style="flex: 2;"></span>
-                            <span style="flex: 1; text-align: center;">
-                                <t t-esc="line.qty || 0" />
-                            </span>
-                            <span style="flex: 1; text-align: right;">
-                                <t t-esc="props.formatCurrency(line.price || 0)" />
-                            </span>
+                        <div style="flex: 1; text-align: center;">
+                            <t t-esc="line.qty || 0" />
+                        </div>
+                        <div style="flex: 1; text-align: right;">
+                            <t t-esc="props.formatCurrency((line.price || 0) * (line.qty || 0))" />
                         </div>
                     </div>
                 </t>
