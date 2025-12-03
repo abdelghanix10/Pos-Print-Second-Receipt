@@ -31,10 +31,10 @@
                         <div style="display: flex;">
                             <span style="flex: 2;"></span>
                             <span style="flex: 1; text-align: center;">
-                                <t t-esc="line.quantity || line.qty || 0" />
+                                <t t-esc="line.qty || 0" />
                             </span>
                             <span style="flex: 1; text-align: right;">
-                                <t t-esc="props.formatCurrency(line.price || line.price_display || 0)" />
+                                <t t-esc="props.formatCurrency(line.price || 0)" />
                             </span>
                         </div>
                     </div>
