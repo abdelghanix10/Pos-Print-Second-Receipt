@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_pos_config_form_inherit_second_receipt" model="ir.ui.view">
+        <field name="name">pos.config.form.inherit.second_receipt</field>
+        <field name="model">pos.config</field>
+        <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[@class='row mt16 o_settings_container' and not(@id)]" position="inside">
+                <setting string="Second Receipt" help="Enable printing of a second simplified receipt after the main receipt.">
+                    <field name="second_receipt_enabled"/>
+                </setting>
+            </xpath>
+        </field>
+    </record>
+</odoo>

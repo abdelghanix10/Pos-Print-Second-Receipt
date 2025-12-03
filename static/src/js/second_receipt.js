@@ -26,6 +26,12 @@ patch(PosStore.prototype, {
     // Call the original printReceipt
     const result = await super.printReceipt(...arguments);
 
+    // Check if second receipt is enabled
+    if (!this.config.second_receipt_enabled) {
+      console.log("POS Print Second Receipt: Second receipt disabled");
+      return result;
+    }
+
     console.log(
       "POS Print Second Receipt: Original print finished, waiting 1s then printing second..."
     );
@@ -78,13 +84,15 @@ patch(PaymentScreen.prototype, {
       : order.orderlines || [];
     this.pos.secondReceiptData = {
       name: order.name,
-      date: order.date_order
-        ? order.date_order.toFormat
-          ? order.date_order.toFormat("yyyy-MM-dd")
-          : order.date_order.toLocaleDateString
-          ? order.date_order.toLocaleDateString()
-          : order.date_order
-        : "",
+      date: (function () {
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, "0");
+        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
+          now.getDate()
+        )} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(
+          now.getSeconds()
+        )}`;
+      })(),
       orderlines: lines.map((line) => {
         const product = line.get_product ? line.get_product() : line.product;
         return {

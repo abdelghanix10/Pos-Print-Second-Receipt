@@ -4,7 +4,9 @@
     'category': 'Point of Sale',
     'summary': 'Print a second simplified receipt automatically',
     'depends': ['point_of_sale'],
-    'data': [],
+    'data': [
+        'views/pos_config_views.xml',
+    ],
     'assets': {
         'point_of_sale._assets_pos': [
             'pos_print_second_receipt/static/src/xml/second_receipt.xml',
