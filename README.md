@@ -1,4 +1,4 @@
-"# POS Print Second Receipt
+# POS Print Second Receipt
 
 This Odoo module automatically prints a second simplified receipt after the main receipt in the Point of Sale.
 
@@ -16,4 +16,4 @@ To enable or disable the second receipt printing:
 3. In the **Receipt** section, check or uncheck **Enable Second Receipt**
 4. Save the configuration
 
-When enabled, a second receipt will be printed automatically after the main receipt."
+When enabled, a second receipt will be printed automatically after the main receipt.
