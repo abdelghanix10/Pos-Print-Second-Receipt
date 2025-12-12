@@ -76,7 +76,7 @@ patch(PaymentScreen.prototype, {
     console.log("POS Print Second Receipt: PaymentScreen validateOrder called");
     // Capture the receipt data before finalize
     const order = this.currentOrder;
-    const lines = order.get_orderlines ? order.get_orderlines() : order.orderlines || [];
+    const lines = order.lines || order.orderlines || [];
     this.pos.secondReceiptData = {
       name: order.pos_reference || order.name || "Order",
       date: (function () {
