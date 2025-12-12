@@ -1,6 +1,6 @@
 {
     'name': 'POS Print Second Receipt',
-    'version': '18.0.1.0.0',
+    'version': '19.0.1.0.0',
     'category': 'Point of Sale',
     'summary': 'Print a second simplified receipt automatically',
     'depends': ['point_of_sale'],

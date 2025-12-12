@@ -2,7 +2,7 @@
 
 import { patch } from "@web/core/utils/patch";
 import { Component, onMounted } from "@odoo/owl";
-import { PosStore } from "@point_of_sale/app/store/pos_store";
+import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 
 export class SecondReceipt extends Component {
@@ -48,9 +48,6 @@ patch(PosStore.prototype, {
 
       // Use this.printer which is available in PosStore
       console.log("POS Print Second Receipt: Using printer:", this.printer);
-
-      // Force webPrintFallback to ensure it tries window.print if no device is set
-      // or if we want to force it.
       await this.printer.print(
         SecondReceipt,
         {
@@ -79,11 +76,9 @@ patch(PaymentScreen.prototype, {
     console.log("POS Print Second Receipt: PaymentScreen validateOrder called");
     // Capture the receipt data before finalize
     const order = this.currentOrder;
-    const lines = order.get_orderlines
-      ? order.get_orderlines()
-      : order.orderlines || [];
+    const lines = order.get_orderlines ? order.get_orderlines() : order.orderlines || [];
     this.pos.secondReceiptData = {
-      name: order.name,
+      name: order.pos_reference || order.name || "Order",
       date: (function () {
         const now = new Date();
         const pad = (n) => String(n).padStart(2, "0");
