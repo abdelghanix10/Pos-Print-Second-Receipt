@@ -89,12 +89,10 @@ patch(PaymentScreen.prototype, {
         )}`;
       })(),
       orderlines: lines.map((line) => {
-        const product = line.get_product ? line.get_product() : line.product;
         return {
           id: line.id || line.cid,
-          product_name: product
-            ? product.display_name
-            : line.product_name || "Unknown Product",
+          product_name:
+            line.full_product_name || line.product_name || "Unknown Product",
           qty: line.get_quantity
             ? line.get_quantity()
             : line.quantity || line.qty || 0,
