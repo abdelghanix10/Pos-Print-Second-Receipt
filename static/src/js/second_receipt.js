@@ -23,6 +23,54 @@ export class SecondReceipt extends Component {
 patch(PosStore.prototype, {
   async printReceipt() {
     console.log("POS Print Second Receipt: PosStore printReceipt called");
+
+    // Attempt to define captureData helper if not exists (or just inline it)
+    // We'll inline robust logic here to ensure we get data if PaymentScreen didn't set it.
+    if (!this.secondReceiptData) {
+      let order = null;
+      // Handle Odoo version differences: get_order might be a function, or a getter/property
+      if (typeof this.get_order === 'function') {
+        order = this.get_order();
+      } else if (this.get_order) {
+        order = this.get_order;
+      } else if (this.selectedOrder) {
+        order = this.selectedOrder;
+      }
+
+      if (order) {
+        console.log("POS Print Second Receipt: Capturing data from current order (fallback)...");
+        const lines = order.get_orderlines ? order.get_orderlines() : (order.lines || order.orderlines || []);
+        this.secondReceiptData = {
+          name: order.pos_reference || order.name || "Order",
+          date: (function () {
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, "0");
+            return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
+              now.getDate()
+            )} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(
+              now.getSeconds()
+            )}`;
+          })(),
+          orderlines: lines.map((line) => {
+            return {
+              id: line.id || line.cid,
+              product_name:
+                line.full_product_name || line.product_name || "Unknown Product",
+              qty: line.get_quantity
+                ? line.get_quantity()
+                : line.quantity || line.qty || 0,
+              price: line.get_unit_display_price
+                ? line.get_unit_display_price()
+                : line.price || line.price_unit || 0,
+            };
+          }),
+        };
+      }
+    }
+
+    // Capture locally in case strict mode or async changes clear it on 'this'
+    const receiptData = this.secondReceiptData;
+
     // Call the original printReceipt
     const result = await super.printReceipt(...arguments);
 
@@ -40,8 +88,7 @@ patch(PosStore.prototype, {
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     try {
-      const data = this.secondReceiptData;
-      if (!data) {
+      if (!receiptData) {
         console.error("POS Print Second Receipt: No receipt data found");
         return result;
       }
@@ -51,7 +98,7 @@ patch(PosStore.prototype, {
       await this.printer.print(
         SecondReceipt,
         {
-          data: data,
+          data: receiptData,
           formatCurrency: this.env.utils.formatCurrency,
         },
         { webPrintFallback: true }
