@@ -29,7 +29,7 @@ patch(PosStore.prototype, {
     if (!this.secondReceiptData) {
       let order = null;
       // Handle Odoo version differences: get_order might be a function, or a getter/property
-      if (typeof this.get_order === 'function') {
+      if (typeof this.get_order === "function") {
         order = this.get_order();
       } else if (this.get_order) {
         order = this.get_order;
@@ -38,8 +38,12 @@ patch(PosStore.prototype, {
       }
 
       if (order) {
-        console.log("POS Print Second Receipt: Capturing data from current order (fallback)...");
-        const lines = order.get_orderlines ? order.get_orderlines() : (order.lines || order.orderlines || []);
+        console.log(
+          "POS Print Second Receipt: Capturing data from current order (fallback)..."
+        );
+        const lines = order.get_orderlines
+          ? order.get_orderlines()
+          : order.lines || order.orderlines || [];
         this.secondReceiptData = {
           name: order.pos_reference || order.name || "Order",
           date: (function () {
@@ -55,7 +59,9 @@ patch(PosStore.prototype, {
             return {
               id: line.id || line.cid,
               product_name:
-                line.full_product_name || line.product_name || "Unknown Product",
+                line.full_product_name ||
+                line.product_name ||
+                "Unknown Product",
               qty: line.get_quantity
                 ? line.get_quantity()
                 : line.quantity || line.qty || 0,
@@ -110,6 +116,9 @@ patch(PosStore.prototype, {
         "POS Print Second Receipt: Failed to print second receipt:",
         e
       );
+    } finally {
+      // Clear the data after use to prevent stale data on next order
+      this.secondReceiptData = null;
     }
 
     return result;
