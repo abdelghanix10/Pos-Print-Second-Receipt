@@ -99,16 +99,26 @@ patch(PosStore.prototype, {
         return result;
       }
 
-      // Use this.printer which is available in PosStore
+      // Check print method from config
+      const printMethod =
+        this.config.second_receipt_print_method || "chrome_dialog";
+      console.log("POS Print Second Receipt: Using print method:", printMethod);
       console.log("POS Print Second Receipt: Using printer:", this.printer);
-      await this.printer.print(
-        SecondReceipt,
-        {
-          data: receiptData,
-          formatCurrency: this.env.utils.formatCurrency,
-        },
-        { webPrintFallback: true }
-      );
+
+      if (printMethod === "qz_tray") {
+        // Use QZ Tray for direct printing
+        await this.printSecondReceiptWithQZTray(receiptData);
+      } else {
+        // Use Chrome print dialog (default)
+        await this.printer.print(
+          SecondReceipt,
+          {
+            data: receiptData,
+            formatCurrency: this.env.utils.formatCurrency,
+          },
+          { webPrintFallback: true }
+        );
+      }
 
       console.log("POS Print Second Receipt: Second receipt printed");
     } catch (e) {
@@ -126,6 +136,61 @@ patch(PosStore.prototype, {
 });
 
 console.log("POS Print Second Receipt: Module loaded");
+
+// QZ Tray printing helper method
+PosStore.prototype.printSecondReceiptWithQZTray = async function (receiptData) {
+  try {
+    if (typeof qz === "undefined") {
+      console.error("POS Print Second Receipt: QZ Tray is not loaded");
+      throw new Error(
+        "QZ Tray is not available. Please ensure QZ Tray is installed and running."
+      );
+    }
+
+    // Connect to QZ Tray if not already connected
+    if (!qz.websocket.isActive()) {
+      console.log("POS Print Second Receipt: Connecting to QZ Tray...");
+      await qz.websocket.connect();
+    }
+
+    // Get the default printer or configured printer
+    const printer = await qz.printers.getDefault();
+    console.log("POS Print Second Receipt: QZ Tray printer:", printer);
+
+    // Build receipt content
+    let receiptContent = [];
+    receiptContent.push("\x1B\x40"); // Initialize printer
+    receiptContent.push("\x1B\x61\x01"); // Center alignment
+    receiptContent.push("SECOND RECEIPT\n");
+    receiptContent.push("================================\n");
+    receiptContent.push("\x1B\x61\x00"); // Left alignment
+    receiptContent.push(`Order: ${receiptData.name}\n`);
+    receiptContent.push(`Date: ${receiptData.date}\n`);
+    receiptContent.push("--------------------------------\n");
+
+    for (const line of receiptData.orderlines) {
+      receiptContent.push(`${line.product_name}\n`);
+      receiptContent.push(
+        `  ${line.qty} x ${this.env.utils.formatCurrency(line.price)}\n`
+      );
+    }
+
+    receiptContent.push("================================\n");
+    receiptContent.push("\n\n\n"); // Feed paper
+    receiptContent.push("\x1D\x56\x00"); // Cut paper
+
+    const config = qz.configs.create(printer);
+    const data = [
+      { type: "raw", format: "command", data: receiptContent.join("") },
+    ];
+
+    await qz.print(config, data);
+    console.log("POS Print Second Receipt: QZ Tray print successful");
+  } catch (error) {
+    console.error("POS Print Second Receipt: QZ Tray print failed:", error);
+    throw error;
+  }
+};
 
 patch(PaymentScreen.prototype, {
   async validateOrder() {
