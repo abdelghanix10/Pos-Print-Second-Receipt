@@ -13,16 +13,11 @@ export class SecondReceipt extends Component {
   };
   setup() {
     super.setup();
-    console.log("POS Print Second Receipt: Component setup...");
-    onMounted(() => {
-      console.log("POS Print Second Receipt: Component mounted!");
-    });
   }
 }
 
 patch(PosStore.prototype, {
   async printReceipt() {
-    console.log("POS Print Second Receipt: PosStore printReceipt called");
 
     // Attempt to define captureData helper if not exists (or just inline it)
     // We'll inline robust logic here to ensure we get data if PaymentScreen didn't set it.
@@ -38,9 +33,6 @@ patch(PosStore.prototype, {
       }
 
       if (order) {
-        console.log(
-          "POS Print Second Receipt: Capturing data from current order (fallback)..."
-        );
         const lines = order.get_orderlines
           ? order.get_orderlines()
           : order.lines || order.orderlines || [];
@@ -82,28 +74,20 @@ patch(PosStore.prototype, {
 
     // Check if second receipt is enabled
     if (!this.config.second_receipt_enabled) {
-      console.log("POS Print Second Receipt: Second receipt disabled");
       return result;
     }
-
-    console.log(
-      "POS Print Second Receipt: Original print finished, waiting 1s then printing second..."
-    );
 
     // Add a delay to avoid conflict with the first print dialog/job
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     try {
       if (!receiptData) {
-        console.error("POS Print Second Receipt: No receipt data found");
         return result;
       }
 
       // Check print method from config
       const printMethod =
         this.config.second_receipt_print_method || "chrome_dialog";
-      console.log("POS Print Second Receipt: Using print method:", printMethod);
-      console.log("POS Print Second Receipt: Using printer:", this.printer);
 
       if (printMethod === "qz_tray") {
         // Use QZ Tray for direct printing
@@ -120,12 +104,7 @@ patch(PosStore.prototype, {
         );
       }
 
-      console.log("POS Print Second Receipt: Second receipt printed");
     } catch (e) {
-      console.error(
-        "POS Print Second Receipt: Failed to print second receipt:",
-        e
-      );
     } finally {
       // Clear the data after use to prevent stale data on next order
       this.secondReceiptData = null;
@@ -135,13 +114,11 @@ patch(PosStore.prototype, {
   },
 });
 
-console.log("POS Print Second Receipt: Module loaded");
 
 // QZ Tray printing helper method
 PosStore.prototype.printSecondReceiptWithQZTray = async function (receiptData) {
   try {
     if (typeof qz === "undefined") {
-      console.error("POS Print Second Receipt: QZ Tray is not loaded");
       throw new Error(
         "QZ Tray is not available. Please ensure QZ Tray is installed and running."
       );
@@ -149,13 +126,11 @@ PosStore.prototype.printSecondReceiptWithQZTray = async function (receiptData) {
 
     // Connect to QZ Tray if not already connected
     if (!qz.websocket.isActive()) {
-      console.log("POS Print Second Receipt: Connecting to QZ Tray...");
       await qz.websocket.connect();
     }
 
     // Get the default printer or configured printer
     const printer = await qz.printers.getDefault();
-    console.log("POS Print Second Receipt: QZ Tray printer:", printer);
 
     // Build receipt content
     let receiptContent = [];
@@ -185,16 +160,13 @@ PosStore.prototype.printSecondReceiptWithQZTray = async function (receiptData) {
     ];
 
     await qz.print(config, data);
-    console.log("POS Print Second Receipt: QZ Tray print successful");
   } catch (error) {
-    console.error("POS Print Second Receipt: QZ Tray print failed:", error);
     throw error;
   }
 };
 
 patch(PaymentScreen.prototype, {
   async validateOrder() {
-    console.log("POS Print Second Receipt: PaymentScreen validateOrder called");
     // Capture the receipt data before finalize
     const order = this.currentOrder;
     const lines = order.lines || order.orderlines || [];
@@ -223,10 +195,6 @@ patch(PaymentScreen.prototype, {
         };
       }),
     };
-    console.log(
-      "POS Print Second Receipt: Captured data",
-      this.pos.secondReceiptData
-    );
     // Call the original validateOrder
     return await super.validateOrder(...arguments);
   },
