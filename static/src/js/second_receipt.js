@@ -1,7 +1,7 @@
 /** @odoo-module */
 
 import { patch } from "@web/core/utils/patch";
-import { Component, onMounted } from "@odoo/owl";
+import { Component } from "@odoo/owl";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
 import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 
@@ -90,7 +90,7 @@ patch(PosStore.prototype, {
         this.config.second_receipt_print_method || "chrome_dialog";
 
       if (printMethod === "qz_tray") {
-        // Use QZ Tray for direct printing
+        // Use QZ Tray for direct printing (same method as first receipt)
         await this.printSecondReceiptWithQZTray(receiptData);
       } else {
         // Use Chrome print dialog (default)
@@ -105,6 +105,7 @@ patch(PosStore.prototype, {
       }
 
     } catch (e) {
+      console.error("Second receipt print error:", e);
     } finally {
       // Clear the data after use to prevent stale data on next order
       this.secondReceiptData = null;
@@ -115,53 +116,80 @@ patch(PosStore.prototype, {
 });
 
 
-// QZ Tray printing helper method
+// QZ Tray printing helper method - matches the approach used in odoo_qz_print/pos_qz_patch.js
 PosStore.prototype.printSecondReceiptWithQZTray = async function (receiptData) {
   try {
-    if (typeof qz === "undefined") {
-      throw new Error(
-        "QZ Tray is not available. Please ensure QZ Tray is installed and running."
+    // Get the QZ Tray service (same one used for first receipt in odoo_qz_print)
+    const qzService = this.env.services.qz_tray;
+
+    if (!qzService) {
+      console.error("QZ Tray service not available - falling back to browser print");
+      // Fallback to browser print
+      await this.printer.print(
+        SecondReceipt,
+        {
+          data: receiptData,
+          formatCurrency: this.env.utils.formatCurrency,
+        },
+        { webPrintFallback: true }
       );
+      return;
     }
 
-    // Connect to QZ Tray if not already connected
-    if (!qz.websocket.isActive()) {
-      await qz.websocket.connect();
-    }
+    // Connect to QZ Tray (this handles security/certificate configuration)
+    await qzService.connect();
 
-    // Get the default printer or configured printer
-    const printer = await qz.printers.getDefault();
+    // Get the QZ library
+    const qzLib = qzService.getQZ();
 
-    // Build receipt content
-    let receiptContent = [];
-    receiptContent.push("\x1B\x40"); // Initialize printer
-    receiptContent.push("\x1B\x61\x01"); // Center alignment
-    receiptContent.push("SECOND RECEIPT\n");
-    receiptContent.push("================================\n");
-    receiptContent.push("\x1B\x61\x00"); // Left alignment
-    receiptContent.push(`Order: ${receiptData.name}\n`);
-    receiptContent.push(`Date: ${receiptData.date}\n`);
-    receiptContent.push("--------------------------------\n");
-
-    for (const line of receiptData.orderlines) {
-      receiptContent.push(`${line.product_name}\n`);
-      receiptContent.push(
-        `  ${line.qty} x ${this.env.utils.formatCurrency(line.price)}\n`
+    if (!qzLib) {
+      console.error("QZ Tray library not available - falling back to browser print");
+      // Fallback to browser print
+      await this.printer.print(
+        SecondReceipt,
+        {
+          data: receiptData,
+          formatCurrency: this.env.utils.formatCurrency,
+        },
+        { webPrintFallback: true }
       );
+      return;
     }
 
-    receiptContent.push("================================\n");
-    receiptContent.push("\n\n\n"); // Feed paper
-    receiptContent.push("\x1D\x56\x00"); // Cut paper
+    // Get the renderer service from env (same as first receipt)
+    const renderer = this.env.services.renderer;
 
-    const config = qz.configs.create(printer);
-    const data = [
-      { type: "raw", format: "command", data: receiptContent.join("") },
-    ];
+    // Render the SecondReceipt component to HTML using Odoo's renderer
+    const receiptHtml = await renderer.toHtml(
+      SecondReceipt,
+      {
+        data: receiptData,
+        formatCurrency: this.env.utils.formatCurrency,
+      },
+      { addClass: "pos-receipt-print" }
+    );
 
-    await qz.print(config, data);
+    // Get the HTML content
+    const htmlContent = receiptHtml.outerHTML;
+
+    // Get default printer and print using the service's print method
+    const printerName = await qzLib.printers.getDefault();
+    await qzService.print(printerName, htmlContent, "pixel");
   } catch (error) {
-    throw error;
+    console.error("QZ Tray second receipt print error:", error);
+    // Fallback to browser print on error
+    try {
+      await this.printer.print(
+        SecondReceipt,
+        {
+          data: receiptData,
+          formatCurrency: this.env.utils.formatCurrency,
+        },
+        { webPrintFallback: true }
+      );
+    } catch (fallbackError) {
+      console.error("Fallback print also failed:", fallbackError);
+    }
   }
 };
 
