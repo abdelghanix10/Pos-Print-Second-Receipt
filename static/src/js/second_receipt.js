@@ -3,7 +3,6 @@
 import { patch } from "@web/core/utils/patch";
 import { Component } from "@odoo/owl";
 import { PosStore } from "@point_of_sale/app/services/pos_store";
-import { PaymentScreen } from "@point_of_sale/app/screens/payment_screen/payment_screen";
 
 export class SecondReceipt extends Component {
   static template = "pos_print_second_receipt.SecondReceipt";
@@ -16,58 +15,114 @@ export class SecondReceipt extends Component {
   }
 }
 
-patch(PosStore.prototype, {
-  async printReceipt() {
+/**
+ * Helper function to extract receipt data from an order object.
+ * This is called at print time to ensure we have the correct order's data.
+ */
+function extractReceiptData(order) {
+  if (!order) {
+    return null;
+  }
 
-    // Attempt to define captureData helper if not exists (or just inline it)
-    // We'll inline robust logic here to ensure we get data if PaymentScreen didn't set it.
-    if (!this.secondReceiptData) {
-      let order = null;
-      // Handle Odoo version differences: get_order might be a function, or a getter/property
-      if (typeof this.get_order === "function") {
-        order = this.get_order();
-      } else if (this.get_order) {
-        order = this.get_order;
-      } else if (this.selectedOrder) {
-        order = this.selectedOrder;
-      }
+  // Get order lines - handle different Odoo versions
+  let lines = [];
+  if (order.get_orderlines && typeof order.get_orderlines === "function") {
+    lines = order.get_orderlines();
+  } else if (order.lines) {
+    lines = order.lines;
+  } else if (order.orderlines) {
+    lines = order.orderlines;
+  }
 
-      if (order) {
-        const lines = order.get_orderlines
-          ? order.get_orderlines()
-          : order.lines || order.orderlines || [];
-        this.secondReceiptData = {
-          name: order.pos_reference || order.name || "Order",
-          date: (function () {
-            const now = new Date();
-            const pad = (n) => String(n).padStart(2, "0");
-            return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-              now.getDate()
-            )} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(
-              now.getSeconds()
-            )}`;
-          })(),
-          orderlines: lines.map((line) => {
-            return {
-              id: line.id || line.cid,
-              product_name:
-                line.full_product_name ||
-                line.product_name ||
-                "Unknown Product",
-              qty: line.get_quantity
-                ? line.get_quantity()
-                : line.quantity || line.qty || 0,
-              price: line.get_unit_display_price
-                ? line.get_unit_display_price()
-                : line.price || line.price_unit || 0,
-            };
-          }),
-        };
-      }
+  // Get the order date - use the order's date if available, otherwise use validation time
+  let orderDate;
+  if (order.date_order) {
+    // If it's a luxon DateTime object
+    if (order.date_order.toFormat) {
+      orderDate = order.date_order.toFormat("yyyy-MM-dd HH:mm:ss");
+    } else if (order.date_order instanceof Date) {
+      const d = order.date_order;
+      const pad = (n) => String(n).padStart(2, "0");
+      orderDate = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    } else {
+      // It's already a string
+      orderDate = order.date_order;
     }
+  } else if (order.creation_date) {
+    if (order.creation_date.toFormat) {
+      orderDate = order.creation_date.toFormat("yyyy-MM-dd HH:mm:ss");
+    } else {
+      orderDate = String(order.creation_date);
+    }
+  } else {
+    // Fallback to current time
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    orderDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  }
 
-    // Capture locally in case strict mode or async changes clear it on 'this'
-    const receiptData = this.secondReceiptData;
+  return {
+    name: order.pos_reference || order.name || "Order",
+    date: orderDate,
+    orderlines: lines.map((line) => {
+      // Get product name
+      let productName = "Unknown Product";
+      if (line.full_product_name) {
+        productName = line.full_product_name;
+      } else if (line.product_id && line.product_id.display_name) {
+        productName = line.product_id.display_name;
+      } else if (line.product_name) {
+        productName = line.product_name;
+      }
+
+      // Get quantity
+      let qty = 0;
+      if (line.get_quantity && typeof line.get_quantity === "function") {
+        qty = line.get_quantity();
+      } else if (line.quantity !== undefined) {
+        qty = line.quantity;
+      } else if (line.qty !== undefined) {
+        qty = line.qty;
+      }
+
+      // Get price
+      let price = 0;
+      if (line.get_unit_display_price && typeof line.get_unit_display_price === "function") {
+        price = line.get_unit_display_price();
+      } else if (line.price !== undefined) {
+        price = line.price;
+      } else if (line.price_unit !== undefined) {
+        price = line.price_unit;
+      }
+
+      return {
+        id: line.id || line.cid || line.uuid,
+        product_name: productName,
+        qty: qty,
+        price: price,
+      };
+    }),
+  };
+}
+
+/**
+ * Patch PosStore.printReceipt to print a second receipt.
+ * 
+ * The key insight is that printReceipt receives the order as a parameter:
+ *   printReceipt({ order = this.getOrder(), ... })
+ * 
+ * By extracting data directly from this order parameter at print time,
+ * we avoid all race conditions with feedback bypass - each print call
+ * has its own order reference that won't be affected by other orders.
+ */
+patch(PosStore.prototype, {
+  async printReceipt(options = {}) {
+    // Get the order from options - this is the key to avoiding race conditions!
+    // Each printReceipt call receives its own order reference
+    const order = options.order || this.getOrder();
+
+    // Extract receipt data directly from the order at print time
+    const receiptData = extractReceiptData(order);
 
     // Call the original printReceipt
     const result = await super.printReceipt(...arguments);
@@ -77,14 +132,16 @@ patch(PosStore.prototype, {
       return result;
     }
 
+    // Don't print second receipt if no data available
+    if (!receiptData || !receiptData.orderlines || receiptData.orderlines.length === 0) {
+      console.warn("Second receipt: No order data available");
+      return result;
+    }
+
     // Add a delay to avoid conflict with the first print dialog/job
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     try {
-      if (!receiptData) {
-        return result;
-      }
-
       // Check print method from config
       const printMethod =
         this.config.second_receipt_print_method || "chrome_dialog";
@@ -103,12 +160,8 @@ patch(PosStore.prototype, {
           { webPrintFallback: true }
         );
       }
-
     } catch (e) {
       console.error("Second receipt print error:", e);
-    } finally {
-      // Clear the data after use to prevent stale data on next order
-      this.secondReceiptData = null;
     }
 
     return result;
@@ -192,38 +245,3 @@ PosStore.prototype.printSecondReceiptWithQZTray = async function (receiptData) {
     }
   }
 };
-
-patch(PaymentScreen.prototype, {
-  async validateOrder() {
-    // Capture the receipt data before finalize
-    const order = this.currentOrder;
-    const lines = order.lines || order.orderlines || [];
-    this.pos.secondReceiptData = {
-      name: order.pos_reference || order.name || "Order",
-      date: (function () {
-        const now = new Date();
-        const pad = (n) => String(n).padStart(2, "0");
-        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(
-          now.getDate()
-        )} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(
-          now.getSeconds()
-        )}`;
-      })(),
-      orderlines: lines.map((line) => {
-        return {
-          id: line.id || line.cid,
-          product_name:
-            line.full_product_name || line.product_name || "Unknown Product",
-          qty: line.get_quantity
-            ? line.get_quantity()
-            : line.quantity || line.qty || 0,
-          price: line.get_unit_display_price
-            ? line.get_unit_display_price()
-            : line.price || line.price_unit || 0,
-        };
-      }),
-    };
-    // Call the original validateOrder
-    return await super.validateOrder(...arguments);
-  },
-});
