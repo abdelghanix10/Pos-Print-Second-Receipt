@@ -189,11 +189,16 @@ PosStore.prototype.printSecondReceiptWithQZTray = async function (receiptData) {
       return;
     }
 
-    // Connect to QZ Tray (this handles security/certificate configuration)
-    await qzService.connect();
-
     // Get the QZ library
     const qzLib = qzService.getQZ();
+
+    // Check if connection is already active before trying to connect
+    // This avoids "An open connection with QZ Tray already exists" error
+    // when printing second receipt after first receipt already established connection
+    const isActive = qzLib && qzLib.websocket && qzLib.websocket.isActive();
+    if (!isActive) {
+      await qzService.connect();
+    }
 
     if (!qzLib) {
       console.error("QZ Tray library not available - falling back to browser print");
@@ -225,8 +230,8 @@ PosStore.prototype.printSecondReceiptWithQZTray = async function (receiptData) {
     // Get the HTML content
     const htmlContent = receiptHtml.outerHTML;
 
-    // Get default printer and print using the service's print method
-    const printerName = await qzLib.printers.getDefault();
+    // Get default printer using the service's method (handles caching and connection)
+    const printerName = await qzService.getDefaultPrinter();
     await qzService.print(printerName, htmlContent, "pixel");
   } catch (error) {
     console.error("QZ Tray second receipt print error:", error);
